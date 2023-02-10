@@ -1,0 +1,446 @@
+---
+title: "Bellabeat Case Study"
+author: "Alvi H."
+date: "2023-01-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Capstone Bellabeat Case Study
+
+### Purpose & Intent
+
+Conducting a case study for the Google Data Analytic final capstone project. The intention is to use this as a start to my portfolio. 
+
+### About Bellabeat
+
+Bellabeat is a high-tech company that makes fitness accessories & products for women which 
+track health-focused variables such as **activity, sleep, and stress**. Founded in 2013, Bellabeat quickly went on track to become a leader in the tech industry for women's wellness.
+
+### Project Objective
+
+We will analyze the **data of fitness smart-devices**, **spot trends that can help Bellabeat grow**, and  assist with **customer satisfaction**. We will see how the general population may use fitness smart-devices, apply that to help customers, and influence marketing strategy. 
+
+Specifically, I will be trying to see if the amount of physical activity done in a day has any correlation with the type 
+
+### Stake Holders
+
+* Urška Sršen: Co-founder and Chief Creative Officer.
+* Sando Mur: Co-founder and member of the executive team.
+* Bellabeat marketing analytics team
+
+#### Meta Data
+
+Authors:  
+Furberg, R., Brinton, J., Keating, M., & Ortiz, A. (2016).   
+Coverage:  
+Crowd-sourced Fitbit datasets 03.12.2016-05.12.2016 [Data set].   
+Source:  
+Zenodo.[https://doi.org/10.5281/zenodo.53894](https://doi.org/10.5281/zenodo.53894)
+
+It is open to the public domain with complete open-access according to their [lisencing](https://creativecommons.org/licenses/by/4.0/legalcode) (link). 
+
+#### Credibility
+
+This data contains personal tracker **data of 30 fitbit users**. The sample size is **too small to generalize** all Fitbit users and may bring about bias in our data. The data is also from 2016, so the trends may not be current. 
+
+### Processing Data
+
+Working in R to handle the volume of data and for ease of access to great visualization tools. Lets get started.
+
+#### 1) Install and load in packages
+
+```{r echo=TRUE}
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(rmarkdown)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+```
+
+#### 2) Download, upload, then load in the data.
+
+```{r}
+
+dailyActivity <- read.csv("../project/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+hourlySteps <- read.csv("../project/Fitabase Data 4.12.16-5.12.16/hourlySteps_merged.csv")
+hourlyIntensity <- read.csv("../project/Fitabase Data 4.12.16-5.12.16/hourlyIntensities_merged.csv")
+sleepDay <- read.csv("../project/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+hourlyCalories <- read.csv("../project/Fitabase Data 4.12.16-5.12.16/hourlyCalories_merged.csv")
+
+#Now we will get a glimpse of the data to make sure that it has been loaded correctly and to get basic information such as number of variables. 
+
+str(dailyActivity)
+str(hourlySteps)
+str(hourlyIntensity)
+str(sleepDay)
+str(hourlyCalories)
+```
+
+#### 3) Process + clean the data
+
+Lets check if there are any **duplicates**.
+
+```{r echo=TRUE}
+sum(duplicated(dailyActivity))
+sum(duplicated(hourlySteps))
+sum(duplicated(hourlyIntensity))
+sum(duplicated(sleepDay))
+sum(duplicated(hourlyCalories))
+```
+
+
+
+
+
+We have to remove the **duplicates** from one of the tables, sleepDay. Then we'll just check again for redundancy's sake. 
+
+
+
+
+
+
+```{r}
+sleepDay <- distinct(sleepDay)
+
+sum(duplicated(sleepDay))
+```
+
+
+
+
+
+Observing the previous displays of the data, we notice that the dates are formatted as **character** data types. We must format the date and time for each data set so they become a **date** data  type.
+
+
+
+
+
+```{r}
+dailyActivity <- dailyActivity %>%
+  rename("Date" = "ActivityDate") %>% 
+  mutate(Date = as_date(Date, format= "%m/%d/%Y"))
+
+sleepDay <- sleepDay %>%
+  rename("Date" = "SleepDay") %>%
+  mutate(Date = as_date(Date, format = "%m/%d/%Y %I:%M:%S %p"))
+
+hourlySteps <- hourlySteps %>%
+  mutate(ActivityHour = as.POSIXct(ActivityHour, format = "%m/%d/%Y %I:%M:%S %p"))
+
+hourlyIntensity <- hourlyIntensity %>% 
+  mutate(ActivityHour = as.POSIXct(ActivityHour, format = "%m/%d/%Y %I:%M:%S %p"))
+
+hourlyCalories <- hourlyCalories %>% 
+  mutate(ActivityHour = as.POSIXct(ActivityHour, format = "%m/%d/%Y %I:%M:%S %p"))
+
+head(dailyActivity)
+head(sleepDay)
+head(hourlySteps)
+head(hourlyIntensity)
+```
+
+
+
+
+
+
+#### 4) Preparing the data for visualization
+
+
+
+
+
+Lets group up the data by user Id's and the dates the data was gathered. 
+
+
+
+
+
+```{r}
+dailyActivity %>% 
+  group_by(Id) %>% 
+  group_by(Date)
+
+sleepDay %>%
+  group_by(Id) %>% 
+  group_by(Date)
+
+```
+
+
+
+
+
+Lets sum the columns to get a generalized view of the total amount of activities conducted. 
+
+
+
+
+
+```{r}
+dailyActivity$totalActiveMinutes <- dailyActivity$LightlyActiveMinutes + dailyActivity$FairlyActiveMinutes + dailyActivity$VeryActiveMinutes
+
+```
+
+
+
+
+
+Joining sleepDay and dailyActivity for a later comparison of the amount of sleep versus the amount of activity in a day. 
+
+
+
+
+
+```{r}
+sleep_and_activity <- merge(sleepDay, dailyActivity, by = c('Id', 'Date'))
+str(sleep_and_activity)
+```
+
+Lets now take a look at a general summary for for daily activities, which will provide important information such as the average for each variable.
+
+```{r}
+summary(dailyActivity)
+```
+
+
+We can see that the average amount of steps the users took was about 7,638 steps. According to this [study](https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2783711), people who take at least 7,000 steps a day will reduce the risk of early death by 50-70%. 
+
+
+### 5) Data Visualization
+
+
+
+
+
+First, lets compare the amount of activity done in a day versus the total amount of steps in a day. This one should be pretty clear and straightforward.
+
+
+
+
+
+```{r}
+ggplot(data = dailyActivity, mapping = aes(x = totalActiveMinutes, y = TotalSteps)) + 
+  geom_point(color = "black")+
+  labs(x = "Amount of Activity (min)",
+       y = "Amount of Steps",
+       title = "Amount of Activity vs Number of Steps")+
+  geom_jitter()+
+  theme_bw()+
+  stat_cor(method = "pearson", label.x = 100, label.y = 20000)+
+  geom_smooth(color = "green")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
+There is a clear correlation between the amount of activity in a day versus the number of steps in a day. Which makes sense, the more active you are, the more steps you take and vice versa. The R, or the correlation coefficient, is close to 1, which means it is very positively correlated See below for an explanation of what a correlation coefficient is. 
+
+**The "R" is the** Pearson correlation coefficient, or **correlation coefficient**. According to [Wikipedia](https://en.wikipedia.org/wiki/Pearson_correlation_coefficient), the correlation coefficient "is a measure of linear correlation between two sets of data." **It ranges from -1 to 1. If there is a positive correlation, it will be closer to 1. If there is a negative correlation, it will be closer to -1.**
+
+Any one with math or statistics background might find the equation for it familiar: 
+
+$\rho_{x,y}$ = $\frac{cov(XY)}{\vartheta_{x}*\vartheta_{y}}$
+
+where:
+
+* $cov$ is the covarience
+* $\vartheta_{x}$ is the standard deviation of $X$
+* $\vartheta_{y}$ is the standard deviation of $Y$
+
+**The P-value**, according to [MedCalc](https://www.medcalc.org/manual/correlation.php#:~:text=The%20P%2Dvalue%20is%20the,coefficient%20is%20called%20statistically%20significant.), **is the "probability that you would have found the current result if the correlation coefficient were in fact zero (null hypothesis)".**
+
+Now, lets compare the amount of sleep a person gets versus the amount of activity and amount of steps conducted in a day. 
+
+
+
+
+```{r}
+ggarrange(
+  ggplot(data = sleep_and_activity, mapping = aes(x = TotalSteps, y = TotalMinutesAsleep))+
+    geom_point(color = "black")+
+    geom_jitter()+
+    labs(x = "Total Amount of Steps",
+         y = "Total Sleep Time (min)",
+       title = "Total Steps vs Total Sleep")+
+    theme_bw()+
+    stat_cor(method = "pearson", label.x = 10000, label.y = 700)+
+    geom_smooth(color = "red")+
+    theme(plot.title = element_text(hjust = 0.5)),
+  ggplot(data = sleep_and_activity, mapping = aes(x = totalActiveMinutes, y = TotalMinutesAsleep))+
+    geom_point(color = "black")+
+    geom_jitter()+
+    labs(x = "Total Activity Time (min)",
+         y = "Total Sleep Time (min)",
+         title = "Total Active Minutes vs Total Sleep")+
+    theme_bw()+
+    stat_cor(method = "pearson", label.x = 300, label.y = 700)+
+    geom_smooth(color = "red")+
+    theme(plot.title = element_text(hjust = 0.5))
+)
+```
+
+
+
+
+
+For the most part, there isn't much of a correlation going on between sleep, how active the user is, and the amount of steps they take in a day. In fact, there seems to a be small bit of a negative correlation for the amount of steps taken and the amount of sleep.
+
+
+
+
+
+Now lets take a look at what time of day people take the most steps. We need to separate the date from the time. then group them together. Then we will get the days of the week from the newly created column of "date" and make a new column.
+
+
+
+
+
+```{r}
+hourlySteps2 <- hourlySteps %>% 
+  separate(ActivityHour, into = c("date", "time"), sep= " ") %>% 
+  mutate(date = as_date(date))
+
+weekdaySteps <- hourlySteps2 %>% 
+  mutate(weekday = weekdays(date)) %>% 
+  group_by(weekday, time) %>% 
+  summarize(avg_steps = mean(StepTotal))
+weekdaySteps$weekday <- factor(weekdaySteps$weekday, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+ggplot(data = weekdaySteps, mapping = aes(x = weekday, y = time, fill=avg_steps))+
+  labs(x = "Day of the Week",
+       y = "Time of Day", 
+       title = "Steps Through the Week")+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x= element_text(angle = 60))+
+  geom_tile(color = "white", lwd = 1, linetype = 1)+
+  scale_fill_gradient(low = "white", high = "#D55E00")+
+  coord_fixed()
+
+```
+
+
+
+
+
+Taking a close look, you can see that the most steps taken in the week was from 5PM-7PM on Tuesdays and Wednesdays, perhaps doing other activities or commuting after work. 12PM-2PM on a Saturday also had a lot of steps. This could be because people generally like to go out on a Saturday afternoon, from a personal experience. Who doesn't like to go out on a Saturday afternoon?
+
+
+
+
+
+
+```{r}
+
+hourlyCalories2 <- hourlyCalories %>% 
+  separate(ActivityHour, into = c("date", "time"), sep= " ") %>% 
+  mutate(date = as_date(date))
+
+weekdayCalories <- hourlyCalories2 %>% 
+  mutate(weekday = weekdays(date)) %>% 
+  group_by(weekday, time) %>% 
+  summarize(avg_calories = mean(Calories))
+weekdayCalories$weekday <- factor(weekdayCalories$weekday, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+ggplot(data = weekdayCalories, mapping = aes(x = weekday, y = time, fill = avg_calories))+
+  labs(x = "Day of the Week", 
+       y = "Time of Day", 
+       title = "Avg Calories Burned Through the Week")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x= element_text(angle = 60))+
+  geom_tile(color = "white", lwd = 1, linetype = 1)+
+  scale_fill_gradient(low = "white", high = "#D55E00")+
+  coord_fixed()
+  
+  
+```
+
+
+
+
+Observing the average calories lost throughout the week, you can see that there's a very similar pattern to the previous graph. You can see that the most steps taken in the week was from 5PM-7PM on Tuesdays and Wednesdays & 12PM-2PM on Saturdays.
+
+
+
+```{r}
+ggarrange(
+ggplot(data = dailyActivity, mapping = aes(x = totalActiveMinutes, y = Calories))+
+  geom_point(color = "black")+
+  geom_jitter()+
+  labs(x = "Activity (min)",
+       y = "Calories",
+       title = "Total Activity vs Calories Lost")+
+  theme_bw()+
+  stat_cor(method = "pearson", label.x = 300, label.y = 1000)+
+  geom_smooth(method = "lm", color = "green")+
+  theme(plot.title = element_text(hjust = 0.5)),
+
+ggplot(data = dailyActivity, mapping = aes(x = VeryActiveMinutes, y = Calories))+
+  geom_jitter()+
+  geom_point(color = "black")+
+  labs(x = "Activity (min)",
+       y = "Calories",
+       title = "High Activity vs Calories Lost")+
+  theme_bw()+
+  stat_cor(method = "pearson", label.x = 100, label.y = 2500)+
+  geom_smooth(method = "lm", color = "green")+
+  theme(plot.title = element_text(hjust = 0.5))
+)
+ggarrange(
+ggplot(data = dailyActivity, mapping = aes(x = FairlyActiveMinutes, y = Calories))+
+  geom_jitter()+
+  geom_point(color = "black")+
+  labs(x = "Activity (min)",
+       y = "Calories",
+       title = "Medium Activity vs Calories Lost")+
+  theme_bw()+
+  stat_cor(method = "pearson", label.x = 75, label.y = 2500)+
+  geom_smooth(method = "lm", color = "green")+
+  theme(plot.title = element_text(hjust = 0.5)),
+
+ggplot(data = dailyActivity, mapping = aes(x = LightlyActiveMinutes, y = Calories))+
+  geom_jitter()+
+  geom_point(color = "black")+
+  labs(x = "Activity (min)",
+       y = "Calories",
+       title = "Light Activity vs Calories Lost")+
+  theme_bw()+
+  stat_cor(method = "pearson", label.x = 250, label.y = 1000)+
+  geom_smooth(method = "lm", color = "green")+
+  theme(plot.title = element_text(hjust = 0.5))
+)
+```
+
+This correlation seems pretty obvious. The more active you are, the more calories that is lost.
+
+#### 6) Summary
+
+So far, we have observed a few things.
+
+1) There seems to be no correlation between total steps or how active someone is and how much sleep someone gets.
+
+2) The most active times seem to be 5-7PM on Wednesdays and 12-2PM on Saturdays. Perhaps because it happens to occur right after typical work hours, so people go to the gym or do whatever chore is necessary. Also, people like to typically go out and do things on Saturdays around noon.
+
+3) There is a similar correlation between average calories burned through the week and the amount of steps taken in a week. They occur around the same days and times as the previous heat map.
+
+4) There is also a clear correlation between how active someone is and the amount of calories lost, which is obvious. 
+
+#### 7) Recommendations
+
+* Its possible to give a notification mentioning something motivation for those who reach under 7,000 steps after the busiest and most active times, such as, "Keep it up, only an $x$ amount of steps before reaching your goal!" Where the goal can be adjustable but starts at a standard 7,000 steps. Or if they reach the goal, they can simply say "You did it!"
+
+* Perhaps during the busiest times, users can receive a notification telling them to exercise or run if they haven't already. 
+
+* In order to get people to access the app, we need to entice them. Perhaps if they reach certain calorie or steps goals, they can unlock new features in the app such as viewing anonymous data that can be shared for people in the same demographic as them (age, sex, weight). Perhaps a community section where anyone can share their fitness journey as well, so people can relate and be more motivated.
+
+* Maybe adding a screen to the device for an easy view of number of steps or calories lost would be a great quality of life change. Then they can get into the app for more information. 
+
